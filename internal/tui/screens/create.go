@@ -30,6 +30,7 @@ type CreateScreen struct {
 	err       error
 	harness   config.Harness
 	launching bool
+	dangerous bool
 }
 
 func NewCreateScreen(cfg config.Config, root string) CreateScreen {
@@ -72,6 +73,7 @@ func (c CreateScreen) Update(msg tea.Msg) (CreateScreen, tea.Cmd) {
 		if key.Matches(msg, theme.Keys.Back) {
 			if c.step == stepEnterSlug {
 				c.step = stepPickHarness
+				c.dangerous = false
 				return c, nil
 			}
 			return c, func() tea.Msg { return SwitchToHomeMsg{} }
@@ -111,6 +113,11 @@ func (c CreateScreen) updatePickHarness(msg tea.KeyMsg) (CreateScreen, tea.Cmd) 
 }
 
 func (c CreateScreen) updateEnterSlug(msg tea.KeyMsg) (CreateScreen, tea.Cmd) {
+	if msg.Type == tea.KeyTab && c.harness.DangerousArgs != "" {
+		c.dangerous = !c.dangerous
+		return c, nil
+	}
+
 	if msg.Type == tea.KeyEnter {
 		slug := strings.TrimSpace(c.textInput.Value())
 		if slug == "" {
@@ -125,7 +132,7 @@ func (c CreateScreen) updateEnterSlug(msg tea.KeyMsg) (CreateScreen, tea.Cmd) {
 		}
 
 		c.launching = true
-		return c, tea.Exec(buildCmd(c.harness.Cmd, path), func(err error) tea.Msg {
+		return c, tea.Exec(buildCmd(c.harness.CmdWithArgs(c.dangerous), path), func(err error) tea.Msg {
 			return launch.ExecFinishedMsg{Err: err}
 		})
 	}
@@ -174,9 +181,23 @@ func (c CreateScreen) View() string {
 
 	case stepEnterSlug:
 		b.WriteString(theme.StyleSectionLabel.Render("  Harness") + "  " + theme.StyleSelected.Render(c.harness.Name) + "\n\n")
+
+		if c.harness.DangerousArgs != "" {
+			toggle := theme.StyleHelpKey.Render("off")
+			if c.dangerous {
+				toggle = theme.StyleWarning.Render("on")
+			}
+			b.WriteString(theme.StyleSectionLabel.Render("  Dangerous mode") + "  " + toggle + "\n\n")
+		}
+
 		b.WriteString(theme.StyleSectionLabel.Render("  Branch slug") + "\n\n")
 		b.WriteString("  " + c.textInput.View() + "\n\n")
-		b.WriteString(helpBar("enter", "create", "esc", "back"))
+
+		if c.harness.DangerousArgs != "" {
+			b.WriteString(helpBar("enter", "create", "tab", "dangerous", "esc", "back"))
+		} else {
+			b.WriteString(helpBar("enter", "create", "esc", "back"))
+		}
 	}
 
 	return b.String()

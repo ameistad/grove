@@ -1,3 +1,4 @@
 grove
 .DS_Store
 dist/
+.worktrees

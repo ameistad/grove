@@ -154,6 +154,9 @@ func buildCmd(cmdStr, dir string) *execCmd {
 type execCmd struct {
 	cmdStr string
 	dir    string
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
 }
 
 func (e *execCmd) Run() error {
@@ -161,15 +164,15 @@ func (e *execCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
+	cmd.Stdin = e.stdin
+	cmd.Stdout = e.stdout
+	cmd.Stderr = e.stderr
 	return cmd.Run()
 }
 
-func (e *execCmd) SetStdin(r io.Reader)  {}
-func (e *execCmd) SetStdout(w io.Writer) {}
-func (e *execCmd) SetStderr(w io.Writer) {}
+func (e *execCmd) SetStdin(r io.Reader)  { e.stdin = r }
+func (e *execCmd) SetStdout(w io.Writer) { e.stdout = w }
+func (e *execCmd) SetStderr(w io.Writer) { e.stderr = w }
 
 func (h HomeScreen) startDelete() (HomeScreen, tea.Cmd) {
 	if len(h.worktrees) == 0 {

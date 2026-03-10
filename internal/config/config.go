@@ -16,8 +16,16 @@ import (
 var harnessesJSON []byte
 
 type Harness struct {
-	Name string `yaml:"name" json:"name"`
-	Cmd  string `yaml:"cmd" json:"cmd"`
+	Name          string `yaml:"name" json:"name"`
+	Cmd           string `yaml:"cmd" json:"cmd"`
+	DangerousArgs string `yaml:"dangerous_args,omitempty" json:"dangerous_args,omitempty"`
+}
+
+func (h Harness) CmdWithArgs(dangerous bool) string {
+	if dangerous && h.DangerousArgs != "" {
+		return h.Cmd + " " + h.DangerousArgs
+	}
+	return h.Cmd
 }
 
 type Config struct {

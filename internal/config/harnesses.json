@@ -1,6 +1,6 @@
 [
-  { "name": "claude", "cmd": "claude --dangerously-skip-permissions" },
-  { "name": "codex", "cmd": "codex --dangerously-bypass-approvals-and-sandbox" },
+  { "name": "claude", "cmd": "claude", "dangerous_args": "--dangerously-skip-permissions" },
+  { "name": "codex", "cmd": "codex", "dangerous_args": "--dangerously-bypass-approvals-and-sandbox" },
   { "name": "opencode", "cmd": "opencode" },
   { "name": "antigravity", "cmd": "antigravity" },
   { "name": "amp", "cmd": "amp" },
