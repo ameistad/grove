@@ -1,0 +1,9 @@
+[
+  { "name": "claude", "cmd": "claude --dangerously-skip-permissions" },
+  { "name": "codex", "cmd": "codex --dangerously-bypass-approvals-and-sandbox" },
+  { "name": "opencode", "cmd": "opencode" },
+  { "name": "antigravity", "cmd": "antigravity" },
+  { "name": "amp", "cmd": "amp" },
+  { "name": "aider", "cmd": "aider" },
+  { "name": "goose", "cmd": "goose" }
+]
