@@ -36,7 +36,9 @@ type Config struct {
 
 func knownHarnesses() []Harness {
 	var harnesses []Harness
-	json.Unmarshal(harnessesJSON, &harnesses)
+	if err := json.Unmarshal(harnessesJSON, &harnesses); err != nil {
+		panic(fmt.Sprintf("parse embedded harnesses: %v", err))
+	}
 	return harnesses
 }
 

@@ -283,7 +283,6 @@ func (h HomeScreen) View() string {
 
 	if h.err != nil {
 		b.WriteString(theme.StyleError.Render("  error: "+h.err.Error()) + "\n\n")
-		h.err = nil
 	}
 
 	if len(h.worktrees) == 0 {

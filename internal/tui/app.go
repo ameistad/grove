@@ -61,7 +61,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			return m, tea.Sequence(
 				screens.LoadWorktrees(m.repoRoot, m.cfg.WorktreeDir),
-				func() tea.Msg { return screens.HomeErrorMsg{Err: msg.Err} },
+				func() tea.Msg { return screens.HomeErrorMsg(msg) },
 			)
 		}
 		return m, screens.LoadWorktrees(m.repoRoot, m.cfg.WorktreeDir)

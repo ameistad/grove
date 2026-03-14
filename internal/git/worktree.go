@@ -38,17 +38,12 @@ func EnsureGitignore(root, wtDir string) error {
 		}
 	}
 
-	f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
 	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
-		fmt.Fprintln(f)
+		content += "\n"
 	}
-	fmt.Fprintln(f, wtDir)
-	return nil
+	content += wtDir + "\n"
+
+	return os.WriteFile(gitignore, []byte(content), 0o644)
 }
 
 func Create(root, wtDir, slug, harness string) (string, error) {
@@ -62,7 +57,9 @@ func Create(root, wtDir, slug, harness string) (string, error) {
 		return "", fmt.Errorf("creating worktree dir: %w", err)
 	}
 
-	run(root, "worktree", "prune")
+	if err := pruneWorktrees(root); err != nil {
+		return "", err
+	}
 
 	path := filepath.Join(base, slug)
 	if BranchExists(slug) {
@@ -85,7 +82,9 @@ func Create(root, wtDir, slug, harness string) (string, error) {
 func List(root, wtDir string) ([]WorktreeInfo, error) {
 	base := WorktreeBase(root, wtDir)
 
-	run(root, "worktree", "prune")
+	if err := pruneWorktrees(root); err != nil {
+		return nil, err
+	}
 
 	entries, err := os.ReadDir(base)
 	if err != nil {
@@ -136,8 +135,12 @@ func Remove(root, wtDir, slug string, force bool) error {
 		return fmt.Errorf("removing worktree: %w", err)
 	}
 
-	run(root, "worktree", "prune")
-	deleteMeta(base, slug)
+	if err := pruneWorktrees(root); err != nil {
+		return err
+	}
+	if err := deleteMeta(base, slug); err != nil {
+		return fmt.Errorf("removing metadata: %w", err)
+	}
 	return nil
 }
 
@@ -171,10 +174,23 @@ func readMeta(base, slug string) WorktreeMeta {
 	if err != nil {
 		return meta
 	}
-	yaml.Unmarshal(data, &meta)
+	if err := yaml.Unmarshal(data, &meta); err != nil {
+		return WorktreeMeta{}
+	}
 	return meta
 }
 
-func deleteMeta(base, slug string) {
-	os.Remove(metaPath(base, slug))
+func deleteMeta(base, slug string) error {
+	err := os.Remove(metaPath(base, slug))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func pruneWorktrees(root string) error {
+	if _, err := run(root, "worktree", "prune"); err != nil {
+		return fmt.Errorf("pruning worktrees: %w", err)
+	}
+	return nil
 }

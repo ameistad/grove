@@ -1,7 +1,9 @@
 package git
 
 import (
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,7 +16,7 @@ type MergeResult struct {
 
 func Merge(root, wtDir, slug string) (*MergeResult, error) {
 	base := WorktreeBase(root, wtDir)
-	path := base + "/" + slug
+	path := filepath.Join(base, slug)
 
 	if _, err := run(path, "rev-parse", "--abbrev-ref", "HEAD"); err != nil {
 		return nil, fmt.Errorf("worktree not found: %s", slug)
@@ -46,22 +48,30 @@ func Merge(root, wtDir, slug string) (*MergeResult, error) {
 	_, mergeErr := run(root, "merge", branch)
 
 	if mergeErr == nil {
+		var cleanupErrs []error
 		if stashed {
-			run(root, "stash", "pop", "--quiet")
+			if err := popStash(root); err != nil {
+				cleanupErrs = append(cleanupErrs, err)
+			}
 		}
-		run(root, "worktree", "remove", "--force", path)
-		run(root, "worktree", "prune")
-		run(root, "branch", "-d", branch)
-		deleteMeta(base, slug)
+		if err := cleanupMergedWorktree(root, base, path, branch, slug); err != nil {
+			cleanupErrs = append(cleanupErrs, err)
+		}
+		if err := errors.Join(cleanupErrs...); err != nil {
+			return nil, err
+		}
 		return &MergeResult{Success: true}, nil
 	}
 
 	conflictOut, _ := run(root, "diff", "--name-only", "--diff-filter=U")
 	if conflictOut == "" {
+		err := fmt.Errorf("merge failed: %w", mergeErr)
 		if stashed {
-			run(root, "stash", "pop", "--quiet")
+			if popErr := popStash(root); popErr != nil {
+				return nil, errors.Join(err, popErr)
+			}
 		}
-		return nil, fmt.Errorf("merge failed: %w", mergeErr)
+		return nil, err
 	}
 
 	files := strings.Split(conflictOut, "\n")
@@ -97,4 +107,30 @@ Then clean up the worktree:
 		AgentPrompt:   prompt,
 		Stashed:       stashed,
 	}, nil
+}
+
+func cleanupMergedWorktree(root, base, path, branch, slug string) error {
+	var errs []error
+
+	if _, err := run(root, "worktree", "remove", "--force", path); err != nil {
+		errs = append(errs, fmt.Errorf("removing merged worktree: %w", err))
+	}
+	if err := pruneWorktrees(root); err != nil {
+		errs = append(errs, err)
+	}
+	if _, err := run(root, "branch", "-d", branch); err != nil {
+		errs = append(errs, fmt.Errorf("deleting merged branch: %w", err))
+	}
+	if err := deleteMeta(base, slug); err != nil {
+		errs = append(errs, fmt.Errorf("removing metadata: %w", err))
+	}
+
+	return errors.Join(errs...)
+}
+
+func popStash(root string) error {
+	if _, err := run(root, "stash", "pop", "--quiet"); err != nil {
+		return fmt.Errorf("restoring stashed changes: %w", err)
+	}
+	return nil
 }
