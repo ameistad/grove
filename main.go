@@ -3,10 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
-	"syscall"
 
 	"github.com/ameistad/grove/internal/config"
 	"github.com/ameistad/grove/internal/git"
@@ -275,14 +273,13 @@ func cmdNew(cfg config.Config, slug, harnessName, cmdOverride string, dangerous 
 	fmt.Printf("Created worktree %s at %s\n", slug, path)
 
 	cmdStr := harness.CmdWithArgs(dangerous)
-	parts := strings.Fields(cmdStr)
-	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Dir = path
-	cmd.Env = launch.BuildEnv()
+	cmd, err := launch.BuildExecCommand(cmdStr, path)
+	if err != nil {
+		fatal(err)
+	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Run(); err != nil {
 		os.Exit(1)
 	}

@@ -46,6 +46,10 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.Type == tea.KeyCtrlC {
+		return m, tea.Quit
+	}
+
 	switch msg := msg.(type) {
 	case screens.SwitchToCreateMsg:
 		m.screen = screenCreate
@@ -54,6 +58,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case screens.SwitchToHomeMsg:
 		m.screen = screenHome
+		if msg.Err != nil {
+			return m, tea.Sequence(
+				screens.LoadWorktrees(m.repoRoot, m.cfg.WorktreeDir),
+				func() tea.Msg { return screens.HomeErrorMsg{Err: msg.Err} },
+			)
+		}
 		return m, screens.LoadWorktrees(m.repoRoot, m.cfg.WorktreeDir)
 
 	case screens.LaunchAfterCreateMsg:

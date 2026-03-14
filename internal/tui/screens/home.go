@@ -49,6 +49,10 @@ type WorktreesLoadedMsg struct {
 	Err       error
 }
 
+type HomeErrorMsg struct {
+	Err error
+}
+
 func LoadWorktrees(root string, wtDir string) tea.Cmd {
 	return func() tea.Msg {
 		wts, err := git.List(root, wtDir)
@@ -72,11 +76,22 @@ func (h HomeScreen) Update(msg tea.Msg) (HomeScreen, tea.Cmd) {
 			h.cursor = len(h.worktrees) - 1
 		}
 
+	case HomeErrorMsg:
+		h.err = msg.Err
+
 	case launch.ExecFinishedMsg:
 		h.launching = false
+		if msg.Err != nil {
+			h.err = msg.Err
+			return h, nil
+		}
 		return h, LoadWorktrees(h.repoRoot, h.cfg.WorktreeDir)
 
 	case tea.KeyMsg:
+		if h.err != nil {
+			h.err = nil
+		}
+
 		if h.launching {
 			return h, nil
 		}

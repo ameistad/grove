@@ -51,7 +51,9 @@ func (c CreateScreen) Init() tea.Cmd {
 	return nil
 }
 
-type SwitchToHomeMsg struct{}
+type SwitchToHomeMsg struct {
+	Err error
+}
 
 type CreateDoneMsg struct {
 	Slug    string
@@ -63,7 +65,7 @@ func (c CreateScreen) Update(msg tea.Msg) (CreateScreen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case launch.ExecFinishedMsg:
 		c.launching = false
-		return c, func() tea.Msg { return SwitchToHomeMsg{} }
+		return c, func() tea.Msg { return SwitchToHomeMsg{Err: msg.Err} }
 
 	case tea.KeyMsg:
 		if c.launching {

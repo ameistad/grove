@@ -1,18 +1,20 @@
 package launch
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 )
 
 func BuildExecCommand(cmdStr, dir string) (*exec.Cmd, error) {
-	parts := strings.Fields(cmdStr)
+	parts := strings.Fields(strings.TrimSpace(cmdStr))
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("empty harness command")
+	}
 	cmd := exec.Command(parts[0], parts[1:]...)
 	cmd.Dir = dir
 	cmd.Env = BuildEnv()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return cmd, nil
 }
 
