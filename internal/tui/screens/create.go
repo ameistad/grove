@@ -21,16 +21,21 @@ const (
 	stepEnterSlug
 )
 
+type harnessEntry struct {
+	harness config.Harness
+	label   string
+}
+
 type CreateScreen struct {
 	cfg       config.Config
 	repoRoot  string
 	step      createStep
 	cursor    int
+	entries   []harnessEntry
 	textInput textinput.Model
 	err       error
 	harness   config.Harness
 	launching bool
-	dangerous bool
 }
 
 func NewCreateScreen(cfg config.Config, root string) CreateScreen {
@@ -39,10 +44,21 @@ func NewCreateScreen(cfg config.Config, root string) CreateScreen {
 	ti.CharLimit = 64
 	ti.Width = 40
 
+	var entries []harnessEntry
+	for _, h := range cfg.Harnesses {
+		entries = append(entries, harnessEntry{harness: h, label: h.Name})
+		if h.DangerousArgs != "" {
+			variant := h
+			variant.Cmd = h.CmdWithArgs(true)
+			entries = append(entries, harnessEntry{harness: variant, label: h.Name})
+		}
+	}
+
 	return CreateScreen{
 		cfg:       cfg,
 		repoRoot:  root,
 		step:      stepPickHarness,
+		entries:   entries,
 		textInput: ti,
 	}
 }
@@ -75,7 +91,6 @@ func (c CreateScreen) Update(msg tea.Msg) (CreateScreen, tea.Cmd) {
 		if key.Matches(msg, theme.Keys.Back) {
 			if c.step == stepEnterSlug {
 				c.step = stepPickHarness
-				c.dangerous = false
 				return c, nil
 			}
 			return c, func() tea.Msg { return SwitchToHomeMsg{} }
@@ -102,11 +117,11 @@ func (c CreateScreen) updatePickHarness(msg tea.KeyMsg) (CreateScreen, tea.Cmd) 
 			c.cursor--
 		}
 	case key.Matches(msg, theme.Keys.Down):
-		if c.cursor < len(c.cfg.Harnesses)-1 {
+		if c.cursor < len(c.entries)-1 {
 			c.cursor++
 		}
 	case key.Matches(msg, theme.Keys.Enter):
-		c.harness = c.cfg.Harnesses[c.cursor]
+		c.harness = c.entries[c.cursor].harness
 		c.step = stepEnterSlug
 		c.textInput.Focus()
 		return c, c.textInput.Cursor.BlinkCmd()
@@ -115,11 +130,6 @@ func (c CreateScreen) updatePickHarness(msg tea.KeyMsg) (CreateScreen, tea.Cmd) 
 }
 
 func (c CreateScreen) updateEnterSlug(msg tea.KeyMsg) (CreateScreen, tea.Cmd) {
-	if msg.Type == tea.KeyTab && c.harness.DangerousArgs != "" {
-		c.dangerous = !c.dangerous
-		return c, nil
-	}
-
 	if msg.Type == tea.KeyEnter {
 		slug := strings.TrimSpace(c.textInput.Value())
 		if slug == "" {
@@ -134,7 +144,7 @@ func (c CreateScreen) updateEnterSlug(msg tea.KeyMsg) (CreateScreen, tea.Cmd) {
 		}
 
 		c.launching = true
-		return c, tea.Exec(buildCmd(c.harness.CmdWithArgs(c.dangerous), path), func(err error) tea.Msg {
+		return c, tea.Exec(buildCmd(c.harness.Cmd, path), func(err error) tea.Msg {
 			return launch.ExecFinishedMsg{Err: err}
 		})
 	}
@@ -162,7 +172,7 @@ func (c CreateScreen) View() string {
 	case stepPickHarness:
 		b.WriteString(theme.StyleSectionLabel.Render("  Select harness") + "\n\n")
 
-		for i, h := range c.cfg.Harnesses {
+		for i, e := range c.entries {
 			selected := i == c.cursor
 
 			cursor := "  "
@@ -175,31 +185,20 @@ func (c CreateScreen) View() string {
 				nameStyle = theme.StyleSelected
 			}
 
-			b.WriteString(cursor + nameStyle.Render(h.Name) + "  " + theme.StyleHarness.Render(h.Cmd) + "\n")
+			b.WriteString(cursor + nameStyle.Render(e.label) + "  " + theme.StyleHarness.Render(e.harness.Cmd) + "\n")
 		}
 
 		b.WriteString("\n")
 		b.WriteString(helpBar("enter", "select", "esc", "back"))
 
 	case stepEnterSlug:
-		b.WriteString(theme.StyleSectionLabel.Render("  Harness") + "  " + theme.StyleSelected.Render(c.harness.Name) + "\n\n")
-
-		if c.harness.DangerousArgs != "" {
-			toggle := theme.StyleHelpKey.Render("off")
-			if c.dangerous {
-				toggle = theme.StyleWarning.Render("on")
-			}
-			b.WriteString(theme.StyleSectionLabel.Render("  Dangerous mode") + "  " + toggle + "\n\n")
-		}
+		b.WriteString(theme.StyleSectionLabel.Render("  Harness") + "  " + theme.StyleSelected.Render(c.harness.Name) + "\n")
+		b.WriteString(theme.StyleSectionLabel.Render("  Command") + "  " + theme.StyleHarness.Render(c.harness.Cmd) + "\n\n")
 
 		b.WriteString(theme.StyleSectionLabel.Render("  Branch slug") + "\n\n")
 		b.WriteString("  " + c.textInput.View() + "\n\n")
 
-		if c.harness.DangerousArgs != "" {
-			b.WriteString(helpBar("enter", "create", "tab", "dangerous", "esc", "back"))
-		} else {
-			b.WriteString(helpBar("enter", "create", "esc", "back"))
-		}
+		b.WriteString(helpBar("enter", "create", "esc", "back"))
 	}
 
 	return b.String()

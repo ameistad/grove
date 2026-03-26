@@ -50,7 +50,6 @@ func main() {
 	case "new":
 		newArgs := args[1:]
 		var harnessName, cmdOverride string
-		var dangerous bool
 		for len(newArgs) > 0 {
 			switch {
 			case newArgs[0] == "--harness" && len(newArgs) > 1:
@@ -59,18 +58,15 @@ func main() {
 			case newArgs[0] == "--cmd" && len(newArgs) > 1:
 				cmdOverride = newArgs[1]
 				newArgs = newArgs[2:]
-			case newArgs[0] == "--dangerous":
-				dangerous = true
-				newArgs = newArgs[1:]
 			default:
 				goto doneNewFlags
 			}
 		}
 	doneNewFlags:
 		if len(newArgs) < 1 {
-			fatal(fmt.Errorf("usage: grove new [--harness <name>] [--cmd <command>] [--dangerous] <slug>"))
+			fatal(fmt.Errorf("usage: grove new [--harness <name>] [--cmd <command>] <slug>"))
 		}
-		cmdNew(cfg, newArgs[0], harnessName, cmdOverride, dangerous)
+		cmdNew(cfg, newArgs[0], harnessName, cmdOverride)
 	case "rm":
 		if len(args) < 2 {
 			fatal(fmt.Errorf("usage: grove rm <slug>"))
@@ -106,7 +102,6 @@ func printUsage() {
 	fmt.Println("  new <slug>    Create a new worktree and launch harness")
 	fmt.Println("                  --harness <name>  Use a specific harness")
 	fmt.Println("                  --cmd <command>    Override the harness command")
-	fmt.Println("                  --dangerous        Enable dangerous mode")
 	fmt.Println("  rm <slug>     Remove a worktree (--force to skip dirty check)")
 	fmt.Println("  merge <slug>  Merge a worktree back to the current branch")
 	fmt.Println()
@@ -236,7 +231,7 @@ func cmdLs(cfg config.Config) {
 	}
 }
 
-func cmdNew(cfg config.Config, slug, harnessName, cmdOverride string, dangerous bool) {
+func cmdNew(cfg config.Config, slug, harnessName, cmdOverride string) {
 	if err := validateSlug(slug); err != nil {
 		fatal(err)
 	}
@@ -272,8 +267,7 @@ func cmdNew(cfg config.Config, slug, harnessName, cmdOverride string, dangerous 
 
 	fmt.Printf("Created worktree %s at %s\n", slug, path)
 
-	cmdStr := harness.CmdWithArgs(dangerous)
-	cmd, err := launch.BuildExecCommand(cmdStr, path)
+	cmd, err := launch.BuildExecCommand(harness.Cmd, path)
 	if err != nil {
 		fatal(err)
 	}
