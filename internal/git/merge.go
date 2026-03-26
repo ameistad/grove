@@ -48,30 +48,51 @@ func Merge(root, wtDir, slug string) (*MergeResult, error) {
 	_, mergeErr := run(root, "merge", branch)
 
 	if mergeErr == nil {
-		var cleanupErrs []error
+		if err := cleanupMergedWorktree(root, base, path, branch, slug); err != nil {
+			return nil, err
+		}
 		if stashed {
 			if err := popStash(root); err != nil {
-				cleanupErrs = append(cleanupErrs, err)
+				run(root, "reset", "--merge")
+				prompt := fmt.Sprintf(`The merge of branch '%s' (worktree '%s') into '%s' succeeded and the worktree has been removed.
+
+However, restoring your previously stashed changes failed due to conflicts with the newly merged code.
+
+To resolve this, run:
+  git stash pop
+
+Then resolve any conflicts that arise, stage the files with git add, and commit.`, branch, slug, mainBranch)
+				return &MergeResult{
+					Success:     false,
+					AgentPrompt: prompt,
+					Stashed:     true,
+				}, nil
 			}
-		}
-		if err := cleanupMergedWorktree(root, base, path, branch, slug); err != nil {
-			cleanupErrs = append(cleanupErrs, err)
-		}
-		if err := errors.Join(cleanupErrs...); err != nil {
-			return nil, err
 		}
 		return &MergeResult{Success: true}, nil
 	}
 
 	conflictOut, _ := run(root, "diff", "--name-only", "--diff-filter=U")
 	if conflictOut == "" {
-		err := fmt.Errorf("merge failed: %w", mergeErr)
+		run(root, "merge", "--abort")
 		if stashed {
-			if popErr := popStash(root); popErr != nil {
-				return nil, errors.Join(err, popErr)
-			}
+			popStash(root)
 		}
-		return nil, err
+		prompt := fmt.Sprintf(`Merging branch '%s' (worktree '%s') into '%s' failed unexpectedly.
+
+The merge has been aborted and your working tree has been restored to its previous state.
+
+To attempt this merge manually, run:
+  git merge %s
+
+If the merge succeeds, clean up with:
+  git worktree remove --force %s
+  git worktree prune
+  git branch -d %s`, branch, slug, mainBranch, branch, path, branch)
+		return &MergeResult{
+			Success:     false,
+			AgentPrompt: prompt,
+		}, nil
 	}
 
 	files := strings.Split(conflictOut, "\n")
