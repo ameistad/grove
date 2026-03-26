@@ -67,21 +67,13 @@ func (c CreateScreen) Init() tea.Cmd {
 	return nil
 }
 
-type SwitchToHomeMsg struct {
-	Err error
-}
-
-type CreateDoneMsg struct {
-	Slug    string
-	Path    string
-	Harness config.Harness
-}
+type SwitchToHomeMsg struct{}
 
 func (c CreateScreen) Update(msg tea.Msg) (CreateScreen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case launch.ExecFinishedMsg:
 		c.launching = false
-		return c, func() tea.Msg { return SwitchToHomeMsg{Err: msg.Err} }
+		return c, func() tea.Msg { return SwitchToHomeMsg{} }
 
 	case tea.KeyMsg:
 		if c.launching {
